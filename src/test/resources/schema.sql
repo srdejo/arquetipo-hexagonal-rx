@@ -1,4 +1,0 @@
-CREATE TABLE IF NOT EXISTS object_table (
-    object_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(50)
-);

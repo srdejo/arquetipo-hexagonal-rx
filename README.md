@@ -7,9 +7,9 @@ Plantilla base para construir microservicios **reactivos** en **Java + Spring Bo
 * ![Java](https://img.shields.io/badge/java-26-%23ED8B00.svg?style=for-the-badge&logo=openjdk&logoColor=white)
 * ![Spring](https://img.shields.io/badge/Spring_Boot-4.1-6DB33F?style=for-the-badge&logo=spring&logoColor=white)
 * ![Gradle](https://img.shields.io/badge/Gradle-02303A.svg?style=for-the-badge&logo=Gradle&logoColor=white)
-* ![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
+* ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
 
-Además: Spring WebFlux, Spring Data R2DBC (driver `r2dbc-mysql`), Bean Validation, MapStruct, Lombok, springdoc-openapi para WebFlux (Swagger UI), Reactor Test (`StepVerifier`), H2 R2DBC para tests y JaCoCo para cobertura.
+Además: Spring WebFlux, Spring Data R2DBC (driver `r2dbc-postgresql`), Flyway para migraciones, Bean Validation, MapStruct, Lombok, springdoc-openapi para WebFlux (Swagger UI), Reactor Test (`StepVerifier`), H2 R2DBC para tests y JaCoCo para cobertura.
 
 ---
 
@@ -90,9 +90,9 @@ Nada se ejecuta hasta que WebFlux se suscribe a la cadena: cada capa **compone**
 | Imperativo | Reactivo |
 |---|---|
 | `spring-boot-starter-web` | `spring-boot-starter-webflux` |
-| Spring Data JPA + `JpaRepository` | Spring Data R2DBC + `ReactiveCrudRepository` |
+| Spring Data JPA + JDBC (`postgresql`) | Spring Data R2DBC + `r2dbc-postgresql` |
 | `@Entity`, `@GeneratedValue` (Jakarta Persistence) | `@Table`, `@Id`, `@Column` de Spring Data Relational |
-| `ddl-auto: update` | `schema.sql` + `spring.sql.init.mode: always` |
+| Flyway sobre el `DataSource` JDBC de la app | Flyway con su propia conexión JDBC (`spring.flyway.url`), porque no se ejecuta sobre R2DBC |
 | `T` / `List<T>` | `Mono<T>` / `Flux<T>` |
 | `throw new NoDataFoundException()` | `switchIfEmpty(Mono.error(...))` |
 | `MethodArgumentNotValidException` | `WebExchangeBindException` |
@@ -106,7 +106,7 @@ Nada se ejecuta hasta que WebFlux se suscribe a la cadena: cada capa **compone**
 ### Prerrequisitos
 
 * JDK 26 (Gradle toolchain lo puede descargar automáticamente)
-* Una base de datos MySQL accesible
+* Una base de datos PostgreSQL accesible
 * Gradle — opcional, el proyecto incluye el wrapper `./gradlew`
 
 ### Instalación
@@ -122,13 +122,13 @@ Nada se ejecuta hasta que WebFlux se suscribe a la cadena: cada capa **compone**
 
    | Variable | Descripción | Por defecto |
    |---|---|---|
-   | `DB_HOST` | Host de MySQL | `localhost` |
-   | `DB_PORT` | Puerto | `3306` |
+   | `DB_HOST` | Host de PostgreSQL | `localhost` |
+   | `DB_PORT` | Puerto | `5432` |
    | `DB_NAME` | Nombre de la base de datos | `powerup_db` |
-   | `DB_USERNAME` | Usuario | `root` |
-   | `DB_PASSWORD` | Contraseña | `root` |
+   | `DB_USERNAME` | Usuario | `postgres` |
+   | `DB_PASSWORD` | Contraseña | `postgres` |
 
-   Las tablas se crean al arrancar a partir de `src/main/resources/schema.sql`.
+   Al arrancar, **Flyway** aplica las migraciones de `src/main/resources/db/migration`. Flyway trabaja sobre JDBC, por eso `application.yml` define además `spring.flyway.url` con el driver `postgresql`; la aplicación sigue usando solo R2DBC.
 
 ### Ejecutar
 
@@ -154,7 +154,7 @@ curl http://localhost:8081/api/v1/object/
 ./gradlew test
 ```
 
-Los tests usan H2 en memoria vía R2DBC (`src/test/resources/application.yml` y `schema.sql`). Los casos de uso se prueban con mocks de los puertos y `StepVerifier`. El reporte de cobertura de JaCoCo queda en `build/reports/jacoco/test/html/index.html`.
+Los tests usan H2 en memoria (modo PostgreSQL): Flyway aplica las mismas migraciones por JDBC y la app las consulta vía R2DBC (`src/test/resources/application.yml`). Los casos de uso se prueban con mocks de los puertos y `StepVerifier`. El reporte de cobertura de JaCoCo queda en `build/reports/jacoco/test/html/index.html`.
 
 ---
 
@@ -168,7 +168,7 @@ Supongamos que quieres modelar `Restaurant`:
    - `domain/api/IRestaurantServicePort` — qué operaciones ofrece, devolviendo `Mono`/`Flux`.
    - `domain/spi/IRestaurantPersistencePort` — qué necesita persistir.
    - `domain/usecase/RestaurantUseCase` — implementa el puerto de entrada, recibe el de salida por constructor. Sin `@Service`, sin `@Autowired`.
-3. **Infraestructura de salida**: `RestaurantEntity`, `IRestaurantRepository extends ReactiveCrudRepository`, `IRestaurantEntityMapper` y `RestaurantR2dbcAdapter implements IRestaurantPersistencePort`. Añade la tabla a `schema.sql` (main y test).
+3. **Infraestructura de salida**: `RestaurantEntity`, `IRestaurantRepository extends ReactiveCrudRepository`, `IRestaurantEntityMapper` y `RestaurantR2dbcAdapter implements IRestaurantPersistencePort`. Crea la tabla con una nueva migración `db/migration/V2__create_restaurant_table.sql` (nunca edites una migración ya aplicada).
 4. **Aplicación**: DTOs de request/response, sus mappers y `RestaurantHandler`.
 5. **Infraestructura de entrada**: `RestaurantRestController`, que solo habla con el handler.
 6. **Cablea** los nuevos puertos y adaptadores en `BeanConfiguration`.

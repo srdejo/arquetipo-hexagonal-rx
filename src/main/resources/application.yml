@@ -3,12 +3,13 @@ server:
 
 spring:
   r2dbc:
-    url: r2dbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:powerup_db}
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:root}
-  sql:
-    init:
-      mode: always
+    url: r2dbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:powerup_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+  flyway:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:powerup_db}
+    user: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
 
 appDescription: "Pragma Powerup Reactive"
 appVersion: "1.0.0"
